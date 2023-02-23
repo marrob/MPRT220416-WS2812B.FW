@@ -54,6 +54,10 @@ typedef struct _Devic_t
 #define USB_UART_CMD_LENGTH     35
 #define USB_UART_ARG_LENGTH     35
 
+#define STRIP_LEDS_COUNT      10
+#define STRIP_COLORS_PER_LED  3
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,6 +82,8 @@ char    UsbUartRxBuffer[USB_UART_BUFFER_SIZE];
 char    UsbUartTxBuffer[USB_UART_BUFFER_SIZE];
 char    UsbUartCharacter;
 uint8_t UsbUartRxBufferPtr;
+
+//uint32_t DmaBuffer
 
 /* USER CODE END PV */
 

@@ -47,6 +47,7 @@ extern "C" {
     uint8_t SSD1306_SetCursor(int16_t x, int16_t y);
     uint8_t SSD1306_DrawChar(const char ch, const GfxFontTypeDef *font, uint16_t color);
     uint8_t SSD1306_DrawString(const char *string, const GfxFontTypeDef *font, uint16_t color);
+    uint8_t SSD1306_DrawFilledRectangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
     uint8_t SSD1306_DisplayUpdate(void);
     uint8_t SSD1306_DisplayClear(void);
     uint8_t SSD1306_DisplayOff(void);
