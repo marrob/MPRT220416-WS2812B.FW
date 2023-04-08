@@ -50,7 +50,7 @@ typedef struct _Devic_t
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define USB_UART_BUFFER_SIZE    40
+#define USB_UART_BUFFER_SIZE    64
 #define USB_UART_CMD_LENGTH     35
 #define USB_UART_ARG_LENGTH     35
 
@@ -80,8 +80,8 @@ Device_t Device;
 /*** USB-UART ***/
 char    UsbUartRxBuffer[USB_UART_BUFFER_SIZE];
 char    UsbUartTxBuffer[USB_UART_BUFFER_SIZE];
-char    UsbUartCharacter;
-uint8_t UsbUartRxBufferPtr;
+__IO char    UsbUartCharacter;
+__IO uint8_t UsbUartRxBufferPtr;
 
 //uint32_t DmaBuffer
 
@@ -502,7 +502,11 @@ char* UsbUartParser(char *line)
 
   sscanf(line, "%s",cmd);
 
-  if(!strcmp(cmd, "*OPC?"))
+  if(!strcmp(cmd, "*IDN?"))
+  {
+    sprintf(buffer, "*IDN? %s", DEVICE_NAME);
+  }
+  else if(!strcmp(cmd, "*OPC?"))
   {
     strcpy(buffer, "*OPC? OK");
   }
