@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "LiveLed.h"
 #include "vt100.h"
-#include "SSD1306_128x32_I2C.h"
+#include "SSD1306.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,7 +56,6 @@ typedef struct _Devic_t
 
 #define STRIP_LEDS_COUNT      10
 #define STRIP_COLORS_PER_LED  3
-
 
 /* USER CODE END PD */
 
@@ -98,9 +97,6 @@ static void MX_USART1_UART_Init(void);
 /*** Live LED ***/
 void LiveLedOn(void);
 void LiveLedOff(void);
-
-/*** LCD ***/
-uint8_t DisplayI2CWrite(uint8_t* wdata, size_t wlength);
 
 /*** USB-UART ***/
 char* UsbUartParser(char *line);
@@ -153,7 +149,7 @@ int main(void)
   printf(VT100_ATTR_RESET);
 
   /*** Display ***/
-  SSD1306_Init(DisplayI2CWrite);
+  SSD1306_Init(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
   SSD1306_DisplayClear();
   SSD1306_DisplayUpdate();
 
@@ -411,35 +407,6 @@ int _write(int file, char *ptr, int len)
   return len;
 }
 
-/* Display -------------------------------------------------------------------*/
-uint8_t DisplayI2CWrite(uint8_t* wdata, size_t wlength){
-
-  uint32_t timestamp = HAL_GetTick();
-  uint8_t address = 0x78;
-  while (HAL_I2C_GetState(&hi2c2) != HAL_I2C_STATE_READY){
-    if(HAL_GetTick() - timestamp > 100){
-      Device.Diag.LcdTimeout++;
-      return 1;
-    }
-  }
-  while (HAL_I2C_IsDeviceReady(&hi2c2, address, 3, 300) != HAL_OK){
-    if(HAL_GetTick() - timestamp > 100){
-      Device.Diag.LcdTimeout++;
-      return 1;
-    }
-  }
-  HAL_I2C_Master_Transmit(&hi2c2, address, wdata, wlength, 100);
-  while (HAL_I2C_GetState(&hi2c2) != HAL_I2C_STATE_READY){
-    if(HAL_GetTick() - timestamp > 100){
-      Device.Diag.LcdTimeout++;
-      return 1;
-    }
-  }
-  return 0;
-}
-
-
-
 /* UART-----------------------------------------------------------------------*/
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *context)
 {
@@ -449,7 +416,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *context)
   {
     if(UsbUartRxBufferPtr < USB_UART_BUFFER_SIZE - 1)
     {
-      if(UsbUartCharacter == '\n')
+      if(UsbUartCharacter == UART_TERIMINATION_CHAR)
       {
         UsbUartRxBuffer[UsbUartRxBufferPtr] = '\0';
         strcpy(UsbUartTxBuffer, UsbUartParser(UsbUartRxBuffer));
@@ -480,10 +447,13 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 
 void UsbUartTxTask(void)
 {
-  uint8_t txn=strlen(UsbUartTxBuffer);
-  if(txn != 0)
+  uint8_t txLen = strlen(UsbUartTxBuffer);
+  if(txLen != 0)
   {
-    HAL_UART_Transmit(&huart1, (uint8_t*) UsbUartTxBuffer, txn, 100);
+    UsbUartTxBuffer[txLen] = UART_TERIMINATION_CHAR;
+    UsbUartTxBuffer[txLen + 1] = '\0';
+
+    HAL_UART_Transmit(&huart1, (uint8_t*) UsbUartTxBuffer, txLen + 1, 100);
     UsbUartTxBuffer[0] = 0;
   }
 }
@@ -548,7 +518,6 @@ char* UsbUartParser(char *line)
   {
     Device.Diag.UsbUartUnknwonCnt++;
   }
-  strcat(buffer,"\n");
   return buffer;
 }
 /* USER CODE END 4 */

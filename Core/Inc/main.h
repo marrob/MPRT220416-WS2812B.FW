@@ -46,8 +46,8 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-#define   DEVICE_OK   0
-#define   DEVICE_FAIL 1
+#define DEVICE_OK   0
+#define DEVICE_FAIL 1
 
 #define DEVICE_NAME             "MPRT220416"
 #define DEVICE_NAME_SIZE        sizeof(DEVICE_NAME)
@@ -57,6 +57,9 @@ extern "C" {
 #define DEVICE_PCB_SIZE         sizeof(DEVICE_PCB)
 #define DEVICE_MNF              "github.com/marrob"
 #define DEVICE_MNF_SIZE         sizeof(DEVICE_MNF)
+
+#define UART_TERIMINATION_CHAR  '\r' //0x0D
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
