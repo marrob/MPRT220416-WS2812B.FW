@@ -59,8 +59,13 @@ extern "C" {
 #define DEVICE_MNF_SIZE         sizeof(DEVICE_MNF)
 
 #define UART_TERIMINATION_CHAR  '\r' //0x0D
+#define UART_BUFFER_SIZE    64
+#define UART_CMD_LENGTH     35
+#define UART_ARG_LENGTH     35
 
 /* USER CODE END EM */
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -72,6 +77,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LIVE_LED_Pin GPIO_PIN_3
 #define LIVE_LED_GPIO_Port GPIOA
+#define DBG_PERIOD_CLK_Pin GPIO_PIN_4
+#define DBG_PERIOD_CLK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

@@ -21,12 +21,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "LiveLed.h"
-#include "vt100.h"
-#include "SSD1306.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "LiveLed.h"
+#include "vt100.h"
+#include "display.h"
+#include "leds_strip.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,9 +41,10 @@ typedef struct _Devic_t
   struct _Diag
   {
     uint32_t LcdTimeout;
-    uint32_t UsbUartUnknwonCnt;
-    uint32_t UsbUartErrorCnt;
+    uint32_t UartUnknwonCnt;
+    uint32_t UartErrorCnt;
     uint32_t UpTimeSec;
+    uint32_t TransactionCnt;
   }Diag;
 
 }Device_t;
@@ -50,12 +53,8 @@ typedef struct _Devic_t
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define USB_UART_BUFFER_SIZE    64
-#define USB_UART_CMD_LENGTH     35
-#define USB_UART_ARG_LENGTH     35
-
-#define STRIP_LEDS_COUNT      10
-#define STRIP_COLORS_PER_LED  3
+#define LEDS_COUNT      10
+#define COLORS_PER_LED   3
 
 /* USER CODE END PD */
 
@@ -67,31 +66,29 @@ typedef struct _Devic_t
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
 
-SPI_HandleTypeDef hspi2;
+TIM_HandleTypeDef htim1;
+DMA_HandleTypeDef hdma_tim1_ch1;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
 LiveLED_HnadleTypeDef hLiveLed;
 Device_t Device;
 
-
 /*** USB-UART ***/
-char    UsbUartRxBuffer[USB_UART_BUFFER_SIZE];
-char    UsbUartTxBuffer[USB_UART_BUFFER_SIZE];
-__IO char    UsbUartCharacter;
-__IO uint8_t UsbUartRxBufferPtr;
-
-//uint32_t DmaBuffer
+char    UartRxBuffer[UART_BUFFER_SIZE];
+char    UartTxBuffer[UART_BUFFER_SIZE];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C2_Init(void);
-static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /*** Live LED ***/
@@ -99,8 +96,9 @@ void LiveLedOn(void);
 void LiveLedOff(void);
 
 /*** USB-UART ***/
-char* UsbUartParser(char *line);
-void UsbUartTxTask(void);
+void UartRxTask(void);
+void UartTxTask(void);
+char* UartParser(char *line);
 
 /*** Tools ***/
 void UpTimeTask(void);
@@ -140,37 +138,32 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C2_Init();
-  MX_SPI2_Init();
   MX_USART1_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   printf(VT100_CLEARSCREEN);
   printf(VT100_CURSORHOME);
   printf(VT100_ATTR_RESET);
 
   /*** Display ***/
-  SSD1306_Init(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
-  SSD1306_DisplayClear();
-  SSD1306_DisplayUpdate();
-
-  SSD1306_DrawPixel(0, 0, SSD1306_WHITE);
-  SSD1306_DrawPixel(SSD1306_WIDTH - 1, SSD1306_HEIGHT - 1, SSD1306_WHITE);
-  SSD1306_DrawLine(0, 1, 127, 1, SSD1306_WHITE);
-  SSD1306_DrawLine(0, 2, 127, 2, SSD1306_WHITE);
-  SSD1306_DrawLine(3, 3, 4, 4, SSD1306_WHITE);
-
-  SSD1306_SetCursor(0, 4);
-  SSD1306_DrawString("Hello World", &GfxFont7x8, SSD1306_WHITE );
-  SSD1306_DisplayUpdate();
-
-  //SSD1306_DisplayClear();
-  //SSD1306_DisplayUpdate();
+  DisplayInit(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
+  DisplayClear();
+  DisplayUpdate();
+  DisplaySetCursor(0, 4);
+  DisplayDrawString("Hello World", &GfxFont7x8, SSD1306_WHITE );
+  DisplayUpdate();
 
   /*** LiveLed ***/
   hLiveLed.LedOffFnPtr = &LiveLedOff;
   hLiveLed.LedOnFnPtr = &LiveLedOn;
   hLiveLed.HalfPeriodTimeMs = 500;
   LiveLedInit(&hLiveLed);
+
+  /*** LEDs Strip ***/
+  LedsInit(&htim1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -183,17 +176,27 @@ int main(void)
 
     if(HAL_GetTick() - timestamp > 250)
     {
+      DisplayClear();
+
       timestamp = HAL_GetTick();
-      SSD1306_SetCursor(1, 1);
-      sprintf(string,"Uptime:%lu", Device.Diag.UpTimeSec);
-      SSD1306_DisplayClear();
-      SSD1306_DrawString(string, &GfxFont7x8, SSD1306_WHITE );
-      SSD1306_DisplayUpdate();
+      DisplaySetCursor(5, 8);
+      sprintf(string,"LED STRIP\n"
+                     "Uptime:%lu   ",
+              Device.Diag.UpTimeSec);
+
+      DisplayDrawString(string, &GfxFont7x8, SSD1306_WHITE );
+      DisplayDrawLine(0, 0, SSD1306_WIDTH - 1, 0, SSD1306_WHITE);
+      DisplayDrawLine(0, 0, 0, SSD1306_HEIGHT - 1, SSD1306_WHITE);
+      DisplayDrawLine(0, SSD1306_HEIGHT - 1, SSD1306_WIDTH - 1, SSD1306_HEIGHT - 1, SSD1306_WHITE);
+      DisplayDrawLine(SSD1306_WIDTH - 1, 0, SSD1306_WIDTH - 1, SSD1306_HEIGHT - 1, SSD1306_WHITE);
+
+      DisplayUpdate();
     }
 
     LiveLedTask(&hLiveLed);
+    UartRxTask();
+    UartTxTask();
     UpTimeTask();
-    UsbUartTxTask();
 
     /* USER CODE END WHILE */
 
@@ -277,40 +280,67 @@ static void MX_I2C2_Init(void)
 }
 
 /**
-  * @brief SPI2 Initialization Function
+  * @brief TIM1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_SPI2_Init(void)
+static void MX_TIM1_Init(void)
 {
 
-  /* USER CODE BEGIN SPI2_Init 0 */
+  /* USER CODE BEGIN TIM1_Init 0 */
 
-  /* USER CODE END SPI2_Init 0 */
+  /* USER CODE END TIM1_Init 0 */
 
-  /* USER CODE BEGIN SPI2_Init 1 */
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
-  /* USER CODE END SPI2_Init 1 */
-  /* SPI2 parameter configuration*/
-  hspi2.Instance = SPI2;
-  hspi2.Init.Mode = SPI_MODE_MASTER;
-  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi2.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 45000;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN SPI2_Init 2 */
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 11250;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
 
-  /* USER CODE END SPI2_Init 2 */
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
 
 }
 
@@ -342,9 +372,29 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  if(HAL_UART_Receive_IT(&huart1, (uint8_t *)&UsbUartCharacter, 1) != HAL_OK)
-    Device.Diag.UsbUartErrorCnt++;
+  memset(UartRxBuffer, 0x00, UART_BUFFER_SIZE);
+  if(HAL_UART_Receive_DMA(&huart1, (uint8_t*)UartRxBuffer, UART_BUFFER_SIZE)!= HAL_OK)
+    Device.Diag.UartErrorCnt++;
   /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
@@ -356,6 +406,8 @@ static void MX_USART1_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -363,15 +415,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LIVE_LED_GPIO_Port, LIVE_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LIVE_LED_Pin|DBG_PERIOD_CLK_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : LIVE_LED_Pin */
-  GPIO_InitStruct.Pin = LIVE_LED_Pin;
+  /*Configure GPIO pins : LIVE_LED_Pin DBG_PERIOD_CLK_Pin */
+  GPIO_InitStruct.Pin = LIVE_LED_Pin|DBG_PERIOD_CLK_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LIVE_LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -408,67 +462,55 @@ int _write(int file, char *ptr, int len)
 }
 
 /* UART-----------------------------------------------------------------------*/
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *context)
+void UartRxTask(void)
 {
-  if(HAL_UART_Receive_IT(context, (uint8_t *)&UsbUartCharacter, 1) != HAL_OK)
-    Device.Diag.UsbUartErrorCnt++;
-  else
+  for(uint8_t i=0; i < UART_BUFFER_SIZE; i++)
   {
-    if(UsbUartRxBufferPtr < USB_UART_BUFFER_SIZE - 1)
+    if(UartRxBuffer[i]==UART_TERIMINATION_CHAR)
     {
-      if(UsbUartCharacter == UART_TERIMINATION_CHAR)
-      {
-        UsbUartRxBuffer[UsbUartRxBufferPtr] = '\0';
-        strcpy(UsbUartTxBuffer, UsbUartParser(UsbUartRxBuffer));
-        UsbUartRxBufferPtr = 0;
-      }
-      else
-        UsbUartRxBuffer[UsbUartRxBufferPtr++] = UsbUartCharacter;
+      HAL_UART_DMAStop(&huart1);
+      strcpy(UartTxBuffer, UartParser(UartRxBuffer));
+      memset(UartRxBuffer, 0x00, UART_BUFFER_SIZE);
+      if(HAL_UART_Receive_DMA(&huart1, (uint8_t*)UartRxBuffer, UART_BUFFER_SIZE)!= HAL_OK)
+        Device.Diag.UartErrorCnt++;
+      Device.Diag.TransactionCnt++;
     }
-    else
-    {
-      UsbUartRxBufferPtr = 0;
-      memset(UsbUartRxBuffer,0x00, USB_UART_BUFFER_SIZE);
-    }
+  }
+}
+
+void UartTxTask(void)
+{
+  uint8_t txLen = strlen(UartTxBuffer);
+  if(txLen != 0)
+  {
+    UartTxBuffer[txLen] = UART_TERIMINATION_CHAR;
+    UartTxBuffer[txLen + 1] = '\0';
+
+    HAL_UART_Transmit(&huart1, (uint8_t*) UartTxBuffer, txLen + 1, 100);
+    UartTxBuffer[0] = 0;
   }
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-    Device.Diag.UsbUartErrorCnt++;
-    __HAL_UART_CLEAR_PEFLAG(huart);
-    __HAL_UART_CLEAR_FEFLAG(huart);
-    __HAL_UART_CLEAR_NEFLAG(huart);
-    __HAL_UART_CLEAR_OREFLAG(huart);
-
-  if(HAL_UART_Receive_IT(huart, (uint8_t *)&UsbUartCharacter, 1) != HAL_OK)
-    Device.Diag.UsbUartErrorCnt++;
+  Device.Diag.UartErrorCnt++;
+  __HAL_UART_CLEAR_PEFLAG(huart);
+  __HAL_UART_CLEAR_FEFLAG(huart);
+  __HAL_UART_CLEAR_NEFLAG(huart);
+  __HAL_UART_CLEAR_OREFLAG(huart);
 }
 
-void UsbUartTxTask(void)
+char* UartParser(char *line)
 {
-  uint8_t txLen = strlen(UsbUartTxBuffer);
-  if(txLen != 0)
-  {
-    UsbUartTxBuffer[txLen] = UART_TERIMINATION_CHAR;
-    UsbUartTxBuffer[txLen + 1] = '\0';
+  static char buffer[UART_BUFFER_SIZE];
+  char cmd[UART_CMD_LENGTH];
+  char arg1[UART_ARG_LENGTH];
+  char arg2[UART_ARG_LENGTH];
 
-    HAL_UART_Transmit(&huart1, (uint8_t*) UsbUartTxBuffer, txLen + 1, 100);
-    UsbUartTxBuffer[0] = 0;
-  }
-}
-
-char* UsbUartParser(char *line)
-{
-  static char buffer[USB_UART_BUFFER_SIZE];
-  char cmd[USB_UART_CMD_LENGTH];
-  char arg1[USB_UART_ARG_LENGTH];
-  char arg2[USB_UART_ARG_LENGTH];
-
-  memset(buffer, 0x00, USB_UART_BUFFER_SIZE);
-  memset(cmd,0x00, USB_UART_CMD_LENGTH);
-  memset(arg1,0x00, USB_UART_ARG_LENGTH);
-  memset(arg2,0x00, USB_UART_ARG_LENGTH);
+  memset(buffer, 0x00, UART_BUFFER_SIZE);
+  memset(cmd,0x00, UART_CMD_LENGTH);
+  memset(arg1,0x00, UART_ARG_LENGTH);
+  memset(arg2,0x00, UART_ARG_LENGTH);
 
   sscanf(line, "%s",cmd);
 
@@ -478,19 +520,19 @@ char* UsbUartParser(char *line)
   }
   else if(!strcmp(cmd, "*OPC?"))
   {
-    strcpy(buffer, "*OPC? OK");
+    strcpy(buffer, "*OPC");
   }
   else if(!strcmp(cmd, "FW?"))
   {
-    sprintf(buffer, "FW? %s", DEVICE_FW);
+    sprintf(buffer, "%s", DEVICE_FW);
   }
   else if(!strcmp(cmd, "UID?"))
   {
-    sprintf(buffer, "UID? %4lX%4lX%4lX",HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    sprintf(buffer, "%4lX%4lX%4lX",HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
   }
   else if(!strcmp(cmd, "PCB?"))
   {
-    sprintf(buffer, "PCB? %s", DEVICE_PCB);
+    sprintf(buffer, "%s", DEVICE_PCB);
   }
   else if(!strcmp(cmd,"UPTIME?"))
   {
@@ -498,25 +540,25 @@ char* UsbUartParser(char *line)
   }
   else if(!strcmp(cmd,"DI?"))
   {
-     sprintf(buffer, "DI? %08hX", Device.DI);
+     sprintf(buffer, "%08hX", Device.DI);
   }
   else if(!strcmp(cmd,"DO?"))
   {
-     sprintf(buffer, "DO? %08hX", Device.DO);
+     sprintf(buffer, "%08hX", Device.DO);
   }
   else if(!strcmp(cmd,"UE?"))
   {
-    sprintf(buffer, "UE? %08lX", Device.Diag.UsbUartErrorCnt);
+    sprintf(buffer, "%08lX", Device.Diag.UartErrorCnt);
   }
   else if(!strcmp(cmd,"DO"))
   {
     sscanf(line, "%s %s",cmd, arg1);
     Device.DO = strtol(arg1, NULL, 16);
-    strcpy(buffer, "DO OK");
+    strcpy(buffer, "OK");
   }
   else
   {
-    Device.Diag.UsbUartUnknwonCnt++;
+    Device.Diag.UartUnknwonCnt++;
   }
   return buffer;
 }
