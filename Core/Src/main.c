@@ -146,6 +146,7 @@ int main(void)
   printf(VT100_CLEARSCREEN);
   printf(VT100_CURSORHOME);
   printf(VT100_ATTR_RESET);
+  printf("Hello World");
 
   /*** Display ***/
   DisplayInit(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
@@ -162,7 +163,7 @@ int main(void)
   LiveLedInit(&hLiveLed);
 
   /*** LEDs Strip ***/
-  LedsInit(&htim1);
+  LedsInit(&htim1, &hdma_tim1_ch1);
 
   /* USER CODE END 2 */
 
@@ -197,7 +198,7 @@ int main(void)
     UartRxTask();
     UartTxTask();
     UpTimeTask();
-
+    LedsTask();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -299,9 +300,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 1;
+  htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 45000;
+  htim1.Init.Period = 90;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -316,10 +317,10 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 11250;
+  sConfigOC.Pulse = 45;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -415,10 +416,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LIVE_LED_Pin|DBG_PERIOD_CLK_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LIVE_LED_Pin|DBG_PERIOD_CLK_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LIVE_LED_Pin DBG_PERIOD_CLK_Pin */
-  GPIO_InitStruct.Pin = LIVE_LED_Pin|DBG_PERIOD_CLK_Pin;
+  /*Configure GPIO pins : LIVE_LED_Pin DBG_PERIOD_CLK_Pin PA6 */
+  GPIO_InitStruct.Pin = LIVE_LED_Pin|DBG_PERIOD_CLK_Pin|GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -452,12 +453,10 @@ void LiveLedOff(void)
 /* printf --------------------------------------------------------------------*/
 int _write(int file, char *ptr, int len)
 {
-  HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 100);
-  /*
+  //HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 100);
   int i=0;
   for(i=0 ; i<len ; i++)
     ITM_SendChar((*ptr++));
-    */
   return len;
 }
 

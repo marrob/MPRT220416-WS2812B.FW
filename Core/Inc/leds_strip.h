@@ -16,7 +16,8 @@
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 
-void LedsInit(TIM_HandleTypeDef *htim);
+void LedsInit(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma);
+void LedsTask(void);
 
 #endif /* INC_LEDS_STRIP_H_ */
 
