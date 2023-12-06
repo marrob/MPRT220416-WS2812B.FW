@@ -146,7 +146,7 @@ int main(void)
   printf(VT100_CLEARSCREEN);
   printf(VT100_CURSORHOME);
   printf(VT100_ATTR_RESET);
-  printf("Hello World");
+  printf("Hello, World!\r\n");
 
   /*** Display ***/
   DisplayInit(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
@@ -177,9 +177,9 @@ int main(void)
 
     if(HAL_GetTick() - timestamp > 250)
     {
-      DisplayClear();
-
       timestamp = HAL_GetTick();
+
+      DisplayClear();
       DisplaySetCursor(5, 8);
       sprintf(string,"LED STRIP\n"
                      "Uptime:%lu   ",
@@ -327,6 +327,7 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
+  __HAL_TIM_DISABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_1);
   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
