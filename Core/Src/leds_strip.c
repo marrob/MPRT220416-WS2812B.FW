@@ -13,8 +13,9 @@
 /* Private define ------------------------------------------------------------*/
 
 
-#define LED_COUNT                               6
-#define LED_CFG_BYTES_PER_LED                   3
+#define LED_COUNT          32
+#define LED_COLORS         3
+#define LED_BITS_OF_COLOR  8
 
 
 /* Private macro -------------------------------------------------------------*/
@@ -25,128 +26,66 @@
  *
  * - pl: RGB LED, 3 bájton tárolja a szineit igy az 24 bit
  * - mindig 1 LED értékét tartjuak a DMA bufferében
+ *
  */
 
-uint32_t dmaBuffer[8 * LED_CFG_BYTES_PER_LED];
+uint32_t dmaBuffer[1 + LED_BITS_OF_COLOR * LED_COLORS + 1];
 __IO uint8_t _updateReady;
 __IO uint8_t _ledIndex;
-
 TIM_HandleTypeDef *_htim;
 DMA_HandleTypeDef *_hdma;
 
+/*{
+    0xXXRRGGBB
+    0x00000FF,
+*/
+uint32_t colorBuffer[LED_COUNT];
 
-uint32_t leds_color_data[] =
-{
-    //xxRGB
-    0x0000000FF,
-    0x00000FF00,
-    0x000FF0000,
 
-    0x000FF0000,
-    0x00000FF00,
-    0x0000000FF
-};
+
 
 /* Private function prototypes -----------------------------------------------*/
-void DMATransferCplt(DMA_HandleTypeDef * _hdma);
-void DMATransferStart(uint32_t ledx);
+void LedUpdateStart(uint32_t ledIdx);
 /* Private user code ---------------------------------------------------------*/
 
-/*
- *
- *
- * PA8
- *
- * DMA1 CH2
- */
 void LedsInit(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma)
 {
-
   _htim = htim;
   _hdma = hdma;
-
-  //LL_TIM_EnableARRPreload(htim);
-  /*
-   * 1/48MHz/60000 = 1.25ms
-   */
-  //LL_TIM_SetAutoReload(htim->Instance, 60000);
-
-
-
- // HAL_TIM_PWM_Start(htim,TIM_CHANNEL_1);
-//  HAL_TIM_PWM_Start_IT(htim,TIM_CHANNEL_1);
-
-
- // HAL_StatusTypeDef HAL_TIM_IC_Start_DMA(TIM_HandleTypeDef *htim, uint32_t Channel, uint32_t *pData, uint16_t Length);
-
-//  HAL_TIM_PWM_GetState(htim);
-
-  /*
-  HAL_StatusTypeDef HAL_TIM_PWM_Start_DMA(TIM_HandleTypeDef *htim, uint32_t Channel, const uint32_t *pData,
-                                          uint16_t Length);
-  HAL_StatusTypeDef HAL_TIM_PWM_Stop_DMA(TIM_HandleTypeDef *htim, uint32_t Channel);
-  */
-/*
-  const uint32_t arr = htim->Instance->ARR + 1;
-  const uint32_t pulse_high = (3 * arr / 4) - 1;
-  const uint32_t pulse_low = (1 * arr / 4) - 1;
-  uint32_t r, g, b;
-
-  for(int ledx = 0 ; ledx < sizeof(leds_color_data) / sizeof(leds_color_data[0]); ledx++)
-  {
-
-    r = *((uint8_t *)leds_color_data + ledx * LED_CFG_BYTES_PER_LED + 0);
-    g = *((uint8_t *)leds_color_data + ledx * LED_CFG_BYTES_PER_LED + 1);
-    b = *((uint8_t *)leds_color_data + ledx * LED_CFG_BYTES_PER_LED + 2);
-
-    for (size_t bit = 0; bit < 8; bit++)
-    {
-        dmaBuffer[bit] =        (g & (1 << (7 - bit))) ? pulse_high : pulse_low;
-        dmaBuffer[8 + bit] =    (r & (1 << (7 - bit))) ? pulse_high : pulse_low;
-        dmaBuffer[16 + bit] =   (b & (1 << (7 - bit))) ? pulse_high : pulse_low;
-    }
-  }
-*/
-
-  //HAL_StatusTypeDef HAL_DMA_RegisterCallback(DMA_HandleTypeDef *hdma, HAL_DMA_CallbackIDTypeDef CallbackID, void (* pCallback)( DMA_HandleTypeDef * _hdma));
-
- // HAL_DMA_RegisterCallback(hdma, HAL_DMA_XFER_CPLT_CB_ID, DMATransferCplt );
-
- // __HAL_DMA_ENABLE_IT(hdma, DMA_IT_TC);
-
-
- // DMATransferStart(_ledIndex);
-
   _updateReady = 1;
 
+
+  for(int i = 0; i < LED_COUNT; i++)
+    colorBuffer[i] = 0xFFFFFFF;
 }
 
-void DMATransferStart(uint32_t ledx)
+/*** For WS2812B ***/
+void LedUpdateStart(uint32_t ledIdx)
 {
   const uint32_t arr = _htim->Instance->ARR + 1;
   const uint32_t pulse_high = (3 * arr / 4) - 1;
   const uint32_t pulse_low = (1 * arr / 4) - 1;
   uint32_t r, g, b;
 
-    r = (uint8_t)(leds_color_data[ledx]);
-    g = (uint8_t)(leds_color_data[ledx] >> 8);
-    b = (uint8_t)(leds_color_data[ledx] >> 16);
 
-    //1bit -> 32bit conversion
-    for (size_t bit = 0; bit < 8; bit++)
-    {
-      dmaBuffer[bit] =        (r & (1 << (7 - bit))) ? pulse_high : pulse_low;
-      dmaBuffer[8 + bit] =    (g & (1 << (7 - bit))) ? pulse_high : pulse_low;
-      dmaBuffer[16 + bit] =   (b & (1 << (7 - bit))) ? pulse_high : pulse_low;
-    }
-    int dmaBufferLen = sizeof(dmaBuffer) / sizeof(dmaBuffer[0]);
-    HAL_TIM_PWM_Start_DMA(_htim, TIM_CHANNEL_1, dmaBuffer, dmaBufferLen);
-}
+  /*** 0xXXRRGGBB -> ***/
+  b = (uint8_t)(colorBuffer[ledIdx]); // blue
+  g = (uint8_t)(colorBuffer[ledIdx] >> 8); //green
+  r = (uint8_t)(colorBuffer[ledIdx] >> 16); // red
 
-
-void DMATransferCplt(DMA_HandleTypeDef * _hdma)
-{
-
+  /*** 1LED -> DMA Buffer Conversion ***/
+  for (size_t bit = 0; bit < 8; bit++)
+  {
+    /***  0xXXRRGGBB -> []{ 0x00, 0xG7...0x0G0, 0xR7... 0xR0, 0xB7..0xB0, 0x00 } ***/
+    dmaBuffer[bit + 1] =        (g & (1 << (7 - bit))) ? pulse_high : pulse_low;
+    dmaBuffer[8 + bit + 1] =    (r & (1 << (7 - bit))) ? pulse_high : pulse_low;
+    dmaBuffer[16 + bit + 1] =   (b & (1 << (7 - bit))) ? pulse_high : pulse_low;
+  }
+  int dmaBufferLen = sizeof(dmaBuffer) / sizeof(dmaBuffer[0]);
+  HAL_TIM_PWM_Start_DMA(_htim, TIM_CHANNEL_1, dmaBuffer, dmaBufferLen);
+  /*** Disable not used DMA fucntions ***/
+  __HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
+  __HAL_DMA_DISABLE_IT(_hdma, DMA_IT_TE);
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
@@ -156,8 +95,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
   if(_ledIndex < LED_COUNT - 1 )
   {
     _ledIndex++;
-    __HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
-    DMATransferStart(_ledIndex);
+    LedUpdateStart(_ledIndex);
   }
   else
   {
@@ -165,18 +103,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
     _updateReady = 1;
   }
 
-
-   HAL_GPIO_TogglePin(DBG_PERIOD_CLK_GPIO_Port, DBG_PERIOD_CLK_Pin);
-
-  //  __HAL_TIM_DISABLE(htim);
-}
-void HAL_TIM_PWM_PulseFinishedHalfCpltCallback(TIM_HandleTypeDef *htim)
-{
-    //LL_DMA_EnableIT_TC
-
-  //HAL_TIM_ACTIVE_CHANNEL_1
-
-  //printf("itt jartam\r\n");
+  HAL_GPIO_TogglePin(DBG_PERIOD_CLK_GPIO_Port, DBG_PERIOD_CLK_Pin);
 }
 
 
@@ -192,12 +119,8 @@ void LedsTask(void)
     if(_updateReady)
     {
       _updateReady = 0;
-
-      __HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
-
-      leds_color_data[2] = color++;
-
-      DMATransferStart(_ledIndex);
+      LedUpdateStart(_ledIndex);
+      colorBuffer[2] = color++;
     }
   }
 }
