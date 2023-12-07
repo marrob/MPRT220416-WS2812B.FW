@@ -77,8 +77,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LIVE_LED_Pin GPIO_PIN_3
 #define LIVE_LED_GPIO_Port GPIOA
-#define DBG_PERIOD_CLK_Pin GPIO_PIN_4
-#define DBG_PERIOD_CLK_GPIO_Port GPIOA
+#define DIAG_LED_UPDT_CLK_Pin GPIO_PIN_4
+#define DIAG_LED_UPDT_CLK_GPIO_Port GPIOA
+#define DIAG_LED_STRING_UPDT_CLK_Pin GPIO_PIN_5
+#define DIAG_LED_STRING_UPDT_CLK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

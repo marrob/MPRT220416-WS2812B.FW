@@ -1,21 +1,21 @@
 /*
- * leds_strip.c
+ * ws2812b.c
  *
  *  Created on: Dec 3, 2023
  *      Author: marrob
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "leds_strip.h"
 #include "stm32f1xx_ll_tim.h"
 
 #include <stdio.h>
+#include <ws2812b.h>
 /* Private define ------------------------------------------------------------*/
 
 
-#define LED_COUNT          32
-#define LED_COLORS         3
-#define LED_BITS_OF_COLOR  8
+#define WS2812B_LED_COUNT          3
+#define WS2812B_LED_COLORS         3
+#define WS2812B_LED_BITS_OF_COLOR  8
 
 
 /* Private macro -------------------------------------------------------------*/
@@ -29,18 +29,20 @@
  *
  */
 
-uint32_t dmaBuffer[1 + LED_BITS_OF_COLOR * LED_COLORS + 1];
+uint32_t dmaBuffer[1 + WS2812B_LED_BITS_OF_COLOR * WS2812B_LED_COLORS + 1];
 __IO uint8_t _updateReady;
 __IO uint8_t _ledIndex;
 TIM_HandleTypeDef *_htim;
 DMA_HandleTypeDef *_hdma;
 
-/*{
-    0xXXRRGGBB
-    0x00000FF,
-*/
-uint32_t colorBuffer[LED_COUNT];
 
+uint32_t colorBuffer[WS2812B_LED_COUNT] =
+{
+    //0xXXRRGGBB
+    0x0000FF,
+    0x00FF00,
+    0xFF0000,
+};
 
 
 
@@ -54,9 +56,10 @@ void LedsInit(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma)
   _hdma = hdma;
   _updateReady = 1;
 
-
-  for(int i = 0; i < LED_COUNT; i++)
+/*
+  for(int i = 0; i < WS2812B_LED_COUNT; i++)
     colorBuffer[i] = 0xFFFFFFF;
+    */
 }
 
 /*** For WS2812B ***/
@@ -82,45 +85,47 @@ void LedUpdateStart(uint32_t ledIdx)
     dmaBuffer[16 + bit + 1] =   (b & (1 << (7 - bit))) ? pulse_high : pulse_low;
   }
   int dmaBufferLen = sizeof(dmaBuffer) / sizeof(dmaBuffer[0]);
-  HAL_TIM_PWM_Start_DMA(_htim, TIM_CHANNEL_1, dmaBuffer, dmaBufferLen);
-  /*** Disable not used DMA fucntions ***/
-  __HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
-  __HAL_DMA_DISABLE_IT(_hdma, DMA_IT_TE);
+HAL_TIM_PWM_Start_DMA(_htim, TIM_CHANNEL_1, dmaBuffer, dmaBufferLen);
+/*** Disable not used DMA fucntions ***/
+__HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
+__HAL_DMA_DISABLE_IT(_hdma, DMA_IT_TE);
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
   HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_1);
 
-  if(_ledIndex < LED_COUNT - 1 )
+  if(_ledIndex < WS2812B_LED_COUNT - 1 )
   {
     _ledIndex++;
     LedUpdateStart(_ledIndex);
+
   }
   else
   {
     _ledIndex = 0;
     _updateReady = 1;
+    HAL_GPIO_TogglePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin); //PA5
   }
 
-  HAL_GPIO_TogglePin(DBG_PERIOD_CLK_GPIO_Port, DBG_PERIOD_CLK_Pin);
+  HAL_GPIO_TogglePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin);//PA4
 }
 
 
 void LedsTask(void)
 {
-  static uint8_t color;
-
   static uint32_t timestamp;
   if(HAL_GetTick() - timestamp > 250)
   {
+    HAL_GPIO_WritePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin, GPIO_PIN_RESET);//PA4
+    HAL_GPIO_WritePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin, GPIO_PIN_RESET); //PA5
+
     timestamp = HAL_GetTick();
 
     if(_updateReady)
     {
       _updateReady = 0;
       LedUpdateStart(_ledIndex);
-      colorBuffer[2] = color++;
     }
   }
 }

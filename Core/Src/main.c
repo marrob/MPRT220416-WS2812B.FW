@@ -24,10 +24,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ws2812b.h>
 #include "LiveLed.h"
 #include "vt100.h"
 #include "display.h"
-#include "leds_strip.h"
 
 /* USER CODE END Includes */
 
@@ -414,10 +414,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LIVE_LED_Pin|DBG_PERIOD_CLK_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LIVE_LED_Pin|DIAG_LED_UPDT_CLK_Pin|DIAG_LED_STRING_UPDT_CLK_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LIVE_LED_Pin DBG_PERIOD_CLK_Pin PA6 */
-  GPIO_InitStruct.Pin = LIVE_LED_Pin|DBG_PERIOD_CLK_Pin|GPIO_PIN_6;
+  /*Configure GPIO pins : LIVE_LED_Pin DIAG_LED_UPDT_CLK_Pin DIAG_LED_STRING_UPDT_CLK_Pin PA6 */
+  GPIO_InitStruct.Pin = LIVE_LED_Pin|DIAG_LED_UPDT_CLK_Pin|DIAG_LED_STRING_UPDT_CLK_Pin|GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
