@@ -33,7 +33,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef struct _Devic_t
+typedef struct _Device_t
 {
   uint8_t DO;
   uint8_t DI;
@@ -53,6 +53,7 @@ typedef struct _Devic_t
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define LED_COUNT   3
 
 /* USER CODE END PD */
 
@@ -77,6 +78,9 @@ Device_t Device;
 /*** USB-UART ***/
 char    UartRxBuffer[UART_BUFFER_SIZE];
 char    UartTxBuffer[UART_BUFFER_SIZE];
+
+/*** WS2812B LED ***/
+uint32_t ColorPattern[LED_COUNT];
 
 /* USER CODE END PV */
 
@@ -161,7 +165,8 @@ int main(void)
   LiveLedInit(&hLiveLed);
 
   /*** LEDs Strip ***/
-  LedsInit(&htim1, &hdma_tim1_ch1);
+  WS2812B_Init(&htim1, &hdma_tim1_ch1, ColorPattern, LED_COUNT);
+  WS2812B_SetBrightness(1) ;
 
   /* USER CODE END 2 */
 
@@ -170,8 +175,10 @@ int main(void)
   while (1)
   {
 
+
     static uint32_t timestamp;
     char string[50];
+
 
     if(HAL_GetTick() - timestamp > 250)
     {
@@ -179,7 +186,7 @@ int main(void)
 
       DisplayClear();
       DisplaySetCursor(5, 8);
-      sprintf(string,"LED STRIP\n"
+      sprintf(string,"WS2812B\n"
                      "Uptime:%lu   ",
               Device.Diag.UpTimeSec);
 
@@ -192,11 +199,22 @@ int main(void)
       DisplayUpdate();
     }
 
+    for(int i = 0; i < LED_COUNT; i+= 3)
+    {
+      //RGB
+      ColorPattern[i ] =  0x0000FF;
+      ColorPattern[i + 1] =  0x00FF00;
+      ColorPattern[i + 2] =  0xFF0000;
+    }
+
+
     LiveLedTask(&hLiveLed);
+
     UartRxTask();
     UartTxTask();
     UpTimeTask();
-    LedsTask();
+
+    WS2812B_Task();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
