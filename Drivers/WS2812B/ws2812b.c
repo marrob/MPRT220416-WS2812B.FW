@@ -15,7 +15,10 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-uint32_t _dmaBuffer[1 + WS2812B_LED_BITS_OF_COLOR * WS2812B_LED_COLORS + 1];
+//.RAM-al mükodik a DMA STM32G051, és aligned 4-el nem tudom miért oldotta meg a problémat
+//ellenkezo esetben nem indult el a Timer.
+//STM32F103-eseten nem kellett a .RAM és aligned(4)
+__attribute__((section(".RAM"), aligned(4))) uint32_t _dmaBuffer[1 + WS2812B_LED_BITS_OF_COLOR * WS2812B_LED_COLORS + 1];
 uint32_t *_colorBuffer;
 
 static __IO uint8_t _updateReady;
@@ -50,6 +53,8 @@ void WS2812B_Init(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma, uint32_t *co
 }
 
 //--- For WS2812B ---
+//- A Timer-t a HAL_TIM_PWM_Start_DMA
+//- Mituán a _dmaBuffer-ben lévő PWM kódokat kiküldi, meghivja a HAL_TIM_PWM_PulseFinishedCallback, hogy jöhet a kovetkező LED
 void WS2812B_UpdateStart(uint32_t ledIdx)
 {
   const uint32_t arr = _htim->Instance->ARR + 1;
@@ -83,8 +88,7 @@ void WS2812B_UpdateStart(uint32_t ledIdx)
 }
 
 /*
- * Ez mikor ér vége?
- * Egy Pulus kiküldésekor vagy a telejes DMA küldés végén?
+ * Ez PWM buffer kikuldese után hivodik meg, ez WS2812B_LED_COLORS * 8+2  byte-ot jelent
  */
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
@@ -103,7 +107,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
   HAL_GPIO_TogglePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin);//PA4
 }
 
-
+//Minden hivás után ha már kész van egy LED firssitése, akkor inditja a kovetkezot
 void WS2812B_Task(void)
 {
   static uint32_t timestamp;
