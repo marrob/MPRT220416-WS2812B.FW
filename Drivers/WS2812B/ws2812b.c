@@ -49,7 +49,7 @@ void WS2812B_Init(TIM_HandleTypeDef *htim, DMA_HandleTypeDef *hdma, uint32_t *co
   _colorBuffer = colorBuffer;
 }
 
-/*** For WS2812B ***/
+//--- For WS2812B ---
 void WS2812B_UpdateStart(uint32_t ledIdx)
 {
   const uint32_t arr = _htim->Instance->ARR + 1;
@@ -58,7 +58,7 @@ void WS2812B_UpdateStart(uint32_t ledIdx)
   uint32_t r, g, b;
   uint32_t br_r, br_g, br_b;
 
-  /*** 0xXXRRGGBB -> ***/
+  //--- 0xXXRRGGBB -> ---
   b = (uint8_t)(_colorBuffer[ledIdx]);
   g = (uint8_t)(_colorBuffer[ledIdx] >> 8);
   r = (uint8_t)(_colorBuffer[ledIdx] >> 16);
@@ -67,21 +67,25 @@ void WS2812B_UpdateStart(uint32_t ledIdx)
   br_g = (uint8_t) g * _brightness;
   br_r = (uint8_t) r * _brightness;
 
-  /*** 1LED -> DMA Buffer Conversion ***/
+  //--- 1LED -> DMA Buffer Conversion ---/
   for (size_t bit = 0; bit < 8; bit++)
   {
-    /***  0xXXRRGGBB -> []{ 0x00, 0xG7...0x0G0, 0xR7... 0xR0, 0xB7..0xB0, 0x00 } ***/
+    //--- 0xXXRRGGBB -> []{ 0x00, 0xG7...0x0G0, 0xR7... 0xR0, 0xB7..0xB0, 0x00 } ---
     _dmaBuffer[bit + 1] =        (br_g & (1 << (7 - bit))) ? pulse_high : pulse_low;
     _dmaBuffer[8 + bit + 1] =    (br_r & (1 << (7 - bit))) ? pulse_high : pulse_low;
     _dmaBuffer[16 + bit + 1] =   (br_b & (1 << (7 - bit))) ? pulse_high : pulse_low;
   }
   //int dmaBufferLen = sizeof(_dmaBuffer) / sizeof(_dmaBuffer[0]); //26
   HAL_TIM_PWM_Start_DMA(_htim, TIM_CHANNEL_1, _dmaBuffer, sizeof(_dmaBuffer) / sizeof(_dmaBuffer[0]));
-  /*** Disable not used DMA fucntions ***/
+  //---Disable not used DMA fucntions
   __HAL_DMA_DISABLE_IT (_hdma, DMA_IT_HT);
   __HAL_DMA_DISABLE_IT(_hdma, DMA_IT_TE);
 }
 
+/*
+ * Ez mikor ér vége?
+ * Egy Pulus kiküldésekor vagy a telejes DMA küldés végén?
+ */
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
   HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_1);
