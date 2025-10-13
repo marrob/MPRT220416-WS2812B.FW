@@ -15,10 +15,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-//.RAM-al mükodik a DMA STM32G051, és aligned 4-el nem tudom miért oldotta meg a problémat
-//ellenkezo esetben nem indult el a Timer.
-//STM32F103-eseten nem kellett a .RAM és aligned(4)
-__attribute__((section(".RAM"), aligned(4))) uint32_t _dmaBuffer[1 + WS2812B_LED_BITS_OF_COLOR * WS2812B_LED_COLORS + 1];
+uint32_t _dmaBuffer[1 + WS2812B_LED_BITS_OF_COLOR * WS2812B_LED_COLORS + 1] = {0};
 uint32_t *_colorBuffer;
 
 static __IO uint8_t _updateReady;
