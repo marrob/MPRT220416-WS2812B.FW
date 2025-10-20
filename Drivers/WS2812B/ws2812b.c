@@ -13,7 +13,6 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_ll_tim.h"
 #include <stdio.h>
 #include <ws2812b.h>
 /* Private define ------------------------------------------------------------*/
@@ -106,9 +105,9 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
   else
   {
     _updateReady = 1;
-    HAL_GPIO_TogglePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin); //PA5
+//    HAL_GPIO_TogglePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin); //PA5
   }
-  HAL_GPIO_TogglePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin);//PA4
+//  HAL_GPIO_TogglePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin);//PA4
 }
 
 //Minden hivás után ha már kész van egy LED firssitése, akkor inditja a kovetkezot
@@ -116,8 +115,8 @@ void WS2812B_Task(void)
 {
   static uint32_t timestamp;
 
-  HAL_GPIO_WritePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin, GPIO_PIN_RESET);//PA4
-  HAL_GPIO_WritePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin, GPIO_PIN_RESET); //PA5
+//  HAL_GPIO_WritePin(DIAG_LED_UPDT_CLK_GPIO_Port, DIAG_LED_UPDT_CLK_Pin, GPIO_PIN_RESET);//PA4
+//  HAL_GPIO_WritePin(DIAG_LED_STRING_UPDT_CLK_GPIO_Port, DIAG_LED_STRING_UPDT_CLK_Pin, GPIO_PIN_RESET); //PA5
 
   if(HAL_GetTick() - timestamp > 20) //50Hz
   {
