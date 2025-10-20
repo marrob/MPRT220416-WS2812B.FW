@@ -3,6 +3,13 @@
  *
  *  Created on: Dec 3, 2023
  *      Author: marrob
+ *
+ *
+ *Gyakori problémák:
+ *
+ * - Az UEV periodus idője 2.5ms, kell hogy legyen így a PWM periodus ideje 1.25ms
+ * - A DMA Word széles (32bit) és Memory to Pheri!
+ *
  */
 
 /* Includes ------------------------------------------------------------------*/

@@ -53,7 +53,7 @@ typedef struct _Device_t
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define LED_COUNT   256
+#define LED_COUNT   3
 
 /* USER CODE END PD */
 
@@ -96,6 +96,13 @@ void UpTimeTask(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+//ez itt nem fut
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  __NOP();
+}
 
 /* USER CODE END 0 */
 
@@ -184,10 +191,10 @@ int main(void)
 
     for(int i = 0; i < LED_COUNT; i+= 3)
     {
-      //RGB
-      ColorPattern[i ] =  0x0000FF;
-      ColorPattern[i + 1] =  0x00FF00;
-      ColorPattern[i + 2] =  0xFF0000;
+      //0xXXRRGGBB
+      ColorPattern[i ] =  0x0000FF;     //Blue
+      ColorPattern[i + 1] =  0x00FF00;  //Green
+      ColorPattern[i + 2] =  0xFF0000;  //Red
     }
     LiveLedTask(&hLiveLed);
     UpTimeTask();
