@@ -27,7 +27,7 @@
 #include <ws2812b.h>
 #include "LiveLed.h"
 #include "vt100.h"
-#include "display.h"
+#include "ssd1306.h"
 
 /* USER CODE END Includes */
 
@@ -73,7 +73,7 @@ LiveLED_HnadleTypeDef hLiveLed;
 Device_t Device;
 
 // WS2812B LED ---
-uint32_t ColorPattern[LED_COUNT];
+uint32_t LedColorPattern[LED_COUNT];
 
 /* USER CODE END PV */
 
@@ -145,11 +145,11 @@ int main(void)
   printf("Hello, World!\r\n");
 
   //--- Display ---
-  DisplayInit(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
+  SSD1306_Init(&hi2c2, SSD1306_I2C_DEV_ADDRESS);
   DisplayClear();
   DisplayUpdate();
   DisplaySetCursor(0, 4);
-  DisplayDrawString("Hello World", &GfxFont7x8, SSD1306_WHITE );
+  DisplayDrawString("Hello World", &FontType5x7, SSD1306_WHITE );
   DisplayUpdate();
 
   //--- LiveLed ---
@@ -159,8 +159,8 @@ int main(void)
   LiveLedInit(&hLiveLed);
 
   //--- LEDs Strip ---
-  WS2812B_Init(&htim1, &hdma_tim1_ch1, ColorPattern, LED_COUNT);
-  WS2812B_SetBrightness(10);
+  WS2812B_Init(&htim1, &hdma_tim1_ch1, LedColorPattern, LED_COUNT);
+
 
   /* USER CODE END 2 */
 
@@ -181,21 +181,21 @@ int main(void)
                      "Uptime:%lu   ",
               Device.Diag.UpTimeSec);
 
-      DisplayDrawString(string, &GfxFont7x8, SSD1306_WHITE );
+      DisplayDrawString(string, &FontType5x7, SSD1306_WHITE );
       DisplayDrawLine(0, 0, SSD1306_WIDTH - 1, 0, SSD1306_WHITE);
       DisplayDrawLine(0, 0, 0, SSD1306_HEIGHT - 1, SSD1306_WHITE);
       DisplayDrawLine(0, SSD1306_HEIGHT - 1, SSD1306_WIDTH - 1, SSD1306_HEIGHT - 1, SSD1306_WHITE);
       DisplayDrawLine(SSD1306_WIDTH - 1, 0, SSD1306_WIDTH - 1, SSD1306_HEIGHT - 1, SSD1306_WHITE);
       DisplayUpdate();
+
+      //0xXXRRGGBB
+      LedColorPattern[0] =  0x0000FF;  //Blue
+      LedColorPattern[1] =  0x00FF00;  //Green
+      LedColorPattern[2] =  0xFF0000;  //Red
+      WS2812B_SetBrightness(20, LedColorPattern, LED_COUNT);
+
     }
 
-    for(int i = 0; i < LED_COUNT; i+= 3)
-    {
-      //0xXXRRGGBB
-      ColorPattern[i ] =  0x0000FF;     //Blue
-      ColorPattern[i + 1] =  0x00FF00;  //Green
-      ColorPattern[i + 2] =  0xFF0000;  //Red
-    }
     LiveLedTask(&hLiveLed);
     UpTimeTask();
     WS2812B_Task();

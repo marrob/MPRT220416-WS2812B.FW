@@ -58,11 +58,21 @@ extern "C" {
 #define DEVICE_MNF              "github.com/marrob"
 #define DEVICE_MNF_SIZE         sizeof(DEVICE_MNF)
 
+// --- UART ---
 #define UART_TERIMINATION_CHAR  '\r' //0x0D
 #define UART_BUFFER_SIZE    64
 #define UART_CMD_LENGTH     35
 #define UART_ARG_LENGTH     35
 
+
+//--- SSD1306 Support ---
+#define DisplayDrawString           SSD1306_DrawString
+#define DisplayClear                SSD1306_Clear
+#define DisplaySetCursor            SSD1306_SetCursor
+#define DisplayDrawLine             SSD1306_DrawLine
+#define DisplayDrawCircle           SSD1306_DrawCircle
+#define DisplayDrawFilledRectnagle  SSD1306_FilledRectangle
+#define DisplayUpdate               SSD1306_Update
 /* USER CODE END EM */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
